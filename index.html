@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Y2K STICKER BOOTH 2026</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@700&family=VT323&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root { --p: #ff00ff; --b: #00f0ff; --g: #39ff14; --win: #c0c0c0; }
+        
+        body {
+            background: #000; color: #fff; font-family: 'VT323', monospace; margin: 0; padding: 0;
+            background-image: radial-gradient(circle, #333 1px, transparent 1px);
+            background-size: 20px 20px; overflow-x: hidden;
+        }
+
+        .container { max-width: 500px; margin: 0 auto; padding: 10px; }
+
+        /* Y2K Header */
+        .header-banner {
+            background: var(--p); color: #000; padding: 15px; font-family: 'Syncopate', sans-serif;
+            text-align: center; border: 4px solid #fff; box-shadow: 6px 6px 0px var(--b);
+            margin-bottom: 20px; font-size: 14px; clip-path: polygon(0 15%, 100% 0, 100% 85%, 0% 100%);
+        }
+
+        /* Toolbar chính - Dễ sử dụng */
+        .main-nav {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;
+        }
+
+        .btn-big {
+            background: var(--win); border: 4px solid; border-color: #fff #808080 #808080 #fff;
+            padding: 15px 5px; font-family: 'VT323'; font-size: 1.3rem; font-weight: bold;
+            cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .btn-big:active { border-color: #808080 #fff #fff #808080; transform: translate(2px, 2px); }
+        .btn-edit { background: var(--g); color: #000; grid-column: span 2; }
+        .btn-edit.active { background: #ff4757; color: #fff; animation: blink 0.5s infinite; }
+
+        /* Vùng hiển thị */
+        .display-area {
+            background: #111; border: 4px double var(--b); min-height: 550px;
+            position: relative; overflow: hidden;
+        }
+
+        /* Sticker Engine */
+        .stk-obj { position: absolute; z-index: 100; touch-action: none; padding: 10px; }
+        .stk-obj.editing { border: 2px dashed var(--p); background: rgba(255, 0, 255, 0.1); }
+        .stk-img { width: 100%; height: auto; pointer-events: none; -webkit-user-drag: none; }
+        
+        .stk-tool {
+            position: absolute; width: 30px; height: 30px; background: #fff;
+            border: 2px solid #000; display: none; align-items: center; justify-content: center;
+            font-size: 18px; z-index: 110; border-radius: 4px;
+        }
+        .stk-del { top: -15px; right: -15px; color: red; }
+        .stk-res { bottom: -15px; right: -15px; color: blue; cursor: nwse-resize; }
+        .editing .stk-tool { display: flex; }
+
+        /* Kho sticker hiện đại */
+        .warehouse {
+            position: fixed; bottom: 0; left: 0; right: 0; background: var(--win);
+            border-top: 5px solid #fff; z-index: 2000; height: 400px;
+            display: none; flex-direction: column; transition: 0.3s ease;
+        }
+        .warehouse-nav { background: #000080; color: #fff; padding: 10px; display: flex; justify-content: space-between; }
+        .stk-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+            padding: 15px; overflow-y: auto; background: #fff; flex-grow: 1;
+        }
+        .stk-grid img { width: 100%; height: 60px; object-fit: contain; cursor: pointer; border: 1px solid #ddd; padding: 5px; }
+
+        .polaroid { background: #fff; padding: 10px 10px 30px; margin: 20px; box-shadow: 8px 8px 0px rgba(0,0,0,0.8); }
+        .polaroid img { width: 100%; border: 1px solid #000; }
+
+        @keyframes blink { 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-banner">Y2K_MEMORY_BOOTH_V.26</div>
+
+    <div id="lock-screen" style="text-align: center; padding: 40px;">
+        <p>ENTER ACCESS CODE</p>
+        <input type="password" id="passInput" placeholder="****" style="width:100%; padding:15px; font-size:2rem; background:#000; color:var(--g); border:2px solid var(--g); text-align:center;">
+        <button class="btn-big" style="width:100%; margin-top:15px;" onclick="unlock()">OPEN SYSTEM</button>
+    </div>
+
+    <div id="main-screen" style="display:none;">
+        <div class="main-nav">
+            <button class="btn-big" onclick="document.getElementById('fileInp').click()">🖼️ THÊM ẢNH<br><small>(TỪ ALBUM)</small></button>
+            <button class="btn-big" onclick="toggleWarehouse()">✨ NHÃN DÁN<br><small>(KHO TREND)</small></button>
+            <button class="btn-big" style="grid-column: span 2; background: var(--b);" onclick="document.getElementById('stkInp').click()">🤳 TỰ THÊM STICKER TỪ MÁY</button>
+            <button id="editBtn" class="btn-big btn-edit" onclick="toggleEdit()">CHẾ ĐỘ CHỈNH SỬA: TẮT</button>
+        </div>
+
+        <div id="canvas" class="display-area">
+            <div id="gallery"></div>
+        </div>
+        
+        <p style="text-align:center; font-size:12px; color:var(--g); margin-top:10px;">TIP: BẬT "CHẾ ĐỘ CHỈNH SỬA" ĐỂ DI CHUYỂN VÀ PHÓNG TO</p>
+    </div>
+</div>
+
+<!-- KHO STICKER TRENDING -->
+<div id="warehouse" class="warehouse">
+    <div class="warehouse-nav">
+        <b>KHO ELEMENT HOT 2026</b>
+        <button onclick="toggleWarehouse()" style="background:red; color:white; border:none; padding:5px 15px; font-family:'VT323';">ĐÓNG</button>
+    </div>
+    <div id="stk-grid" class="stk-grid"></div>
+</div>
+
+<!-- INPUT ẨN ĐỂ CHỌN ẢNH -->
+<input type="file" id="fileInp" accept="image/*" style="display:none" onchange="handleUpload('image')">
+<input type="file" id="stkInp" accept="image/*" style="display:none" onchange="handleUpload('sticker')">
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyA8-ctuFLh3DuB68g180CEux7iZ2ZKqYMU",
+        authDomain: "lovetouching-a8981.firebaseapp.com",
+        projectId: "lovetouching-a8981",
+        appId: "1:325823794583:web:6b190f660d75b7e547c8d2"
+    };
+    const CLOUD_NAME = "dvvso2wpc";
+    const UPLOAD_PRESET = "stodjvzb";
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const urlParams = new URLSearchParams(window.location.search);
+    const chipId = urlParams.get('id') || 'customer_demo';
+
+    let currentImages = [], currentStickers = [], isEdit = false;
+
+    // Kho 200+ Sticker giả lập (Bạn có thể thêm link ảnh PNG thật vào đây)
+    const TREND_STICKERS = [
+        'https://api.iconify.design/noto:clown-face.svg', 'https://api.iconify.design/noto:moai.svg',
+        'https://api.iconify.design/noto:alien.svg', 'https://api.iconify.design/noto:sparkles.svg',
+        'https://api.iconify.design/noto:cat-face.svg', 'https://api.iconify.design/noto:heart-decoration.svg',
+        'https://api.iconify.design/noto:videocassette.svg', 'https://api.iconify.design/noto:star.svg'
+    ];
+
+    async function unlock() {
+        const pass = document.getElementById('passInput').value;
+        const doc = await db.collection('toys').doc(chipId).get();
+        const data = doc.exists ? doc.data() : {password: "1234", images: [], stickers: []};
+        if (pass === data.password) {
+            currentImages = data.images || [];
+            currentStickers = data.stickers || [];
+            if(!doc.exists) await db.collection('toys').doc(chipId).set(data);
+            document.getElementById('lock-screen').style.display = 'none';
+            document.getElementById('main-screen').style.display = 'block';
+            renderGallery(); renderStickers(); initWarehouse();
+        } else { alert("SAI MÃ!"); }
+    }
+
+    function toggleEdit() {
+        isEdit = !isEdit;
+        const btn = document.getElementById('editBtn');
+        btn.innerText = isEdit ? "CHẾ ĐỘ CHỈNH SỬA: ĐANG BẬT" : "CHẾ ĐỘ CHỈNH SỬA: TẮT";
+        btn.classList.toggle('active', isEdit);
+        renderStickers(); renderGallery();
+    }
+
+    function initWarehouse() {
+        const grid = document.getElementById('stk-grid');
+        grid.innerHTML = "";
+        for(let i=0; i<60; i++) { // Render demo 60 items
+            const url = TREND_STICKERS[i % TREND_STICKERS.length];
+            const img = document.createElement('img');
+            img.src = url;
+            img.onclick = () => { addStk(url); toggleWarehouse(); };
+            grid.appendChild(img);
+        }
+    }
+
+    function toggleWarehouse() {
+        const w = document.getElementById('warehouse');
+        w.style.display = (w.style.display === 'flex') ? 'none' : 'flex';
+    }
+
+    function addStk(url) {
+        currentStickers.push({ url: url, x: 50, y: 50, w: 120 });
+        save(); renderStickers();
+    }
+
+    function renderStickers() {
+        document.querySelectorAll('.stk-obj').forEach(s => s.remove());
+        currentStickers.forEach((stk, idx) => {
+            const wrap = document.createElement('div');
+            wrap.className = `stk-obj ${isEdit ? 'editing' : ''}`;
+            wrap.style.left = stk.x + 'px'; wrap.style.top = stk.y + 'px';
+            wrap.style.width = stk.w + 'px';
+            wrap.innerHTML = `<img src="${stk.url}" class="stk-img">
+                              <div class="stk-tool stk-del" onclick="deleteStk(${idx})">×</div>
+                              <div class="stk-tool stk-res">⤢</div>`;
+            if(isEdit) makeInteract(wrap, idx);
+            document.getElementById('canvas').appendChild(wrap);
+        });
+    }
+
+    function makeInteract(el, idx) {
+        let isDrag = false, isRes = false, sx, sy, sw;
+        const start = (e) => {
+            const p = e.touches ? e.touches[0] : e;
+            if(e.target.classList.contains('stk-res')) isRes = true; else isDrag = true;
+            sx = p.clientX; sy = p.clientY; sw = el.offsetWidth;
+            e.stopPropagation();
+        };
+        const move = (e) => {
+            if(!isDrag && !isRes) return;
+            const p = e.touches ? e.touches[0] : e;
+            if(isDrag) {
+                const nx = el.offsetLeft + (p.clientX - sx);
+                const ny = el.offsetTop + (p.clientY - sy);
+                el.style.left = nx + 'px'; el.style.top = ny + 'px';
+                currentStickers[idx].x = nx; currentStickers[idx].y = ny;
+            } else {
+                const nw = Math.max(40, sw + (p.clientX - sx));
+                el.style.width = nw + 'px'; currentStickers[idx].w = nw;
+            }
+            sx = p.clientX; sy = p.clientY;
+        };
+        const stop = () => { if(isDrag || isRes) save(); isDrag = isRes = false; };
+
+        el.onmousedown = el.ontouchstart = start;
+        window.onmousemove = window.ontouchmove = move;
+        window.onmouseup = window.ontouchend = stop;
+    }
+
+    function deleteStk(idx) { currentStickers.splice(idx,1); save(); renderStickers(); }
+
+    function renderGallery() {
+        const g = document.getElementById('gallery');
+        g.innerHTML = "";
+        [...currentImages].reverse().forEach((url, i) => {
+            const realIdx = currentImages.length - 1 - i;
+            const d = document.createElement('div');
+            d.className = "polaroid";
+            d.innerHTML = `<img src="${url}">
+                <button onclick="delImg(${realIdx})" style="display:${isEdit?'block':'none'}; position:absolute; top:5px; right:5px; background:red; color:#fff; border:none; padding:10px;">XÓA ẢNH</button>`;
+            g.appendChild(d);
+        });
+    }
+
+    // XỬ LÝ CHỌN FILE TỪ ALBUM MÁY KHÁCH
+    async function handleUpload(type) {
+        const fileInp = (type === 'image') ? document.getElementById('fileInp') : document.getElementById('stkInp');
+        const file = fileInp.files[0];
+        if(!file) return;
+
+        // BƯỚC 1: HIỆN NGAY LẬP TỨC CHO KHÁCH XEM (Dùng Blob URL)
+        const tempUrl = URL.createObjectURL(file);
+        if(type === 'image') {
+            currentImages.push(tempUrl); renderGallery();
+        } else {
+            currentStickers.push({ url: tempUrl, x: 50, y: 50, w: 120 }); renderStickers();
+        }
+
+        // BƯỚC 2: TẢI LÊN CLOUDINARY NGẦM ĐỂ LƯU TRỮ VĨNH VIỄN
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('upload_preset', UPLOAD_PRESET);
+
+        try {
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+            const data = await res.json();
+            
+            // Cập nhật link Blob tạm thời bằng link vĩnh viễn
+            if(type === 'image') {
+                const idx = currentImages.indexOf(tempUrl);
+                if(idx !== -1) currentImages[idx] = data.secure_url;
+            } else {
+                const stk = currentStickers.find(s => s.url === tempUrl);
+                if(stk) stk.url = data.secure_url;
+            }
+            save(); // Lưu vào Firebase
+        } catch (e) { console.error("Upload ngầm thất bại nhưng ảnh vẫn hiện tạm thời"); }
+        fileInp.value = "";
+    }
+
+    async function save() { await db.collection('toys').doc(chipId).update({ images: currentImages, stickers: currentStickers }); }
+    function delImg(idx) { if(confirm("XÓA ẢNH NÀY?")) { currentImages.splice(idx,1); save(); renderGallery(); } }
+</script>
+</body>
+</html>
